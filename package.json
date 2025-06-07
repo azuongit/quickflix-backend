@@ -1,7 +1,7 @@
 {
   "name": "quickflix-backend",
   "version": "1.0.0",
-  "description": "Backend for scraping filmax.to with Puppeteer",
+  "description": "Backend for scraping filmax.to using Puppeteer",
   "main": "index.js",
   "type": "module",
   "scripts": {
