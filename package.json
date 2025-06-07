@@ -5,7 +5,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "postinstall": "npm install --legacy-peer-deps"
   },
   "dependencies": {
     "axios": "^1.6.8",
@@ -14,6 +15,6 @@
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "node-cache": "^5.1.2",
-    "puppeteer-core": "^21.3.8"
+    "puppeteer-core": "^10.1.0"
   }
 }
