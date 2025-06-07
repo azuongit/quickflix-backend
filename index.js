@@ -3,19 +3,15 @@ import cors from 'cors';
 import puppeteer from 'puppeteer-core';
 import chromium from 'chrome-aws-lambda';
 import * as cheerio from 'cheerio';
-import axios from 'axios';
 import NodeCache from 'node-cache';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// Cache for 1 hour
 const cache = new NodeCache({ stdTTL: 3600 });
 
 app.use(cors());
 app.use(express.json());
 
-// Initialize browser instance
 let browser = null;
 
 const initBrowser = async () => {
@@ -31,23 +27,19 @@ const initBrowser = async () => {
   return browser;
 };
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Scrape catalog from filmax.to
 app.get('/api/catalog', async (req, res) => {
   try {
     const { page = 1, search = '', type = 'all' } = req.query;
     const cacheKey = `catalog_${page}_${search}_${type}`;
-    
     const cached = cache.get(cacheKey);
     if (cached) return res.json(cached);
 
     const browser = await initBrowser();
     const pageObj = await browser.newPage();
-
     await pageObj.setUserAgent('Mozilla/5.0');
 
     let url = 'https://filmax.to';
@@ -56,7 +48,8 @@ app.get('/api/catalog', async (req, res) => {
     else if (type === 'series') url += '/series';
     if (page > 1) url += `${search ? '&' : '?'}page=${page}`;
 
-    await pageObj.goto(url, { waitUntil: 'networkidle2' });
+    console.log(`🔍 Navigating to ${url}`);
+    await pageObj.goto(url, { waitUntil: 'networkidle2', timeout: 15000 });
     await pageObj.waitForSelector('.movie-item, .series-item, .content-item', { timeout: 10000 });
 
     const content = await pageObj.content();
@@ -99,12 +92,11 @@ app.get('/api/catalog', async (req, res) => {
     cache.set(cacheKey, result);
     res.json(result);
   } catch (error) {
-    console.error('Catalog scraping error:', error);
-    res.status(500).json({ error: 'Failed to fetch catalog' });
+    console.error('❌ Catalog scraping error:', error.message || error);
+    res.status(500).json({ error: 'Failed to fetch catalog', details: error.message || null });
   }
 });
 
-// Get detailed content info and extract video links
 app.get('/api/content/:id', async (req, res) => {
   try {
     const { link } = req.query;
@@ -131,6 +123,7 @@ app.get('/api/content/:id', async (req, res) => {
     const rating = $('.rating, .imdb-rating').text().trim();
 
     const videoLinks = [];
+
     $('iframe').each((i, el) => {
       const src = $(el).attr('src');
       if (src && (src.includes('streamtape') || src.includes('vidplay') || src.includes('doodstream') || src.includes('mixdrop'))) {
@@ -147,9 +140,8 @@ app.get('/api/content/:id', async (req, res) => {
     });
 
     const scripts = $('script').map((i, el) => $(el).html()).get().join(' ');
-    const videoUrlRegex = /(https?:\/\/[^\s"']+\.(?:mp4|m3u8|mkv|avi))/gi;
+    const videoUrlRegex = /(https?:\/\/[^\s\"']+\\.(mp4|m3u8|mkv|avi))/gi;
     const matches = scripts.match(videoUrlRegex);
-
     if (matches) {
       matches.forEach((url, index) => {
         videoLinks.push({
@@ -180,12 +172,11 @@ app.get('/api/content/:id', async (req, res) => {
     cache.set(cacheKey, result);
     res.json(result);
   } catch (error) {
-    console.error('Content extraction error:', error);
+    console.error('❌ Content scraping error:', error.message || error);
     res.status(500).json({ error: 'Failed to extract content details' });
   }
 });
 
-// Extract actual download link from iframe
 app.post('/api/extract-link', async (req, res) => {
   try {
     const { iframeUrl } = req.body;
@@ -211,8 +202,9 @@ app.post('/api/extract-link', async (req, res) => {
     const $ = cheerio.load(content);
 
     const downloadLinks = [];
-    $('a[href*=".mp4"], a[href*=".mkv"], a[download]').each((index, element) => {
-      const href = $(element).attr('href');
+
+    $('a[href*=\".mp4\"], a[href*=\".mkv\"], a[download]').each((i, el) => {
+      const href = $(el).attr('href');
       if (href) downloadLinks.push(href);
     });
 
@@ -224,7 +216,7 @@ app.post('/api/extract-link', async (req, res) => {
       extractedAt: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Link extraction error:', error);
+    console.error('❌ Link extraction error:', error.message || error);
     res.status(500).json({ error: 'Failed to extract download link' });
   }
 });
