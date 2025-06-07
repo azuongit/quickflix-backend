@@ -1,11 +1,12 @@
 {
   "name": "quickflix-backend",
   "version": "1.0.0",
+  "type": "module",
   "main": "index.js",
   "scripts": {
+    "postinstall": "PUPPETEER_SKIP_DOWNLOAD=true",
     "start": "node index.js"
   },
-  "type": "module",
   "dependencies": {
     "axios": "^1.4.0",
     "cheerio": "^1.0.0-rc.12",
